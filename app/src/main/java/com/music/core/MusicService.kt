@@ -17,6 +17,7 @@
 
 package com.music.core
 
+import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -45,11 +46,10 @@ class MusicService : MediaBrowserServiceCompat() {
     private lateinit var audioManager: AudioManager
     private lateinit var mediaPlayer: MediaPlayer
 
-    private val currentStreamPosition = if (::mediaPlayer.isInitialized) mediaPlayer.currentPosition else 0
 
     private var playbackState = PlaybackStateCompat.STATE_NONE
 
-    private lateinit var mediaNotificationManager: MediaNotificationManager
+    private lateinit var mediaNotificationManager: MediaNotification
 
     // Create Playing Queue from playingQueueMetadata
     private val playingQueue: List<MediaSessionCompat.QueueItem>
@@ -74,6 +74,10 @@ class MusicService : MediaBrowserServiceCompat() {
         return BrowserRoot("root", null)
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        return Service.START_STICKY
+    }
+
     override fun onCreate() {
         super.onCreate()
         // Start a new MediaSession.
@@ -86,7 +90,7 @@ class MusicService : MediaBrowserServiceCompat() {
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-        mediaNotificationManager = MediaNotificationManager(this)
+        mediaNotificationManager = MediaNotification(this)
     }
 
     override fun onDestroy() {
@@ -143,6 +147,8 @@ class MusicService : MediaBrowserServiceCompat() {
                 val mediaId = mediaSession.controller.queue[currentQueueIndex].description.mediaId
                 MusicProvider.setFavorite(mediaId, !MusicProvider.isFavorite(mediaId))
                 updatePlaybackState()
+            } else if (action == "toggle_play") {
+                if (mediaPlayer.isPlaying) onPause() else onPlay()
             }
         }
 
@@ -156,19 +162,13 @@ class MusicService : MediaBrowserServiceCompat() {
             mediaSession.setShuffleMode(shuffleMode)
             if (shuffleMode == PlaybackStateCompat.SHUFFLE_MODE_ALL) {
                 mediaSession.setQueue(playingQueue.shuffled())
-                mediaSession.setQueueTitle("Playing Queue") // TODO ("Put String into Res XML")
-                currentQueueIndex = 0
-                playbackState = PlaybackStateCompat.STATE_PLAYING
-                playCurrentSong()
             } else if (shuffleMode == PlaybackStateCompat.SHUFFLE_MODE_NONE) {
                 mediaSession.setQueue(playingQueue)
-                mediaSession.setQueueTitle("Playing Queue") // TODO ("Put String into Res XML")
-                currentQueueIndex = 0
-                playbackState = PlaybackStateCompat.STATE_PLAYING
-                playCurrentSong()
-
             }
-
+            mediaSession.setQueueTitle("Playing Queue") // TODO ("Put String into Res XML")
+            currentQueueIndex = 0
+            playbackState = PlaybackStateCompat.STATE_PLAYING
+            playCurrentSong()
         }
     }
 
@@ -234,6 +234,7 @@ class MusicService : MediaBrowserServiceCompat() {
 
 
     private fun tryToGetAudioFocus() {
+        updatePlaybackState()
         val mAudioAttributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -307,7 +308,7 @@ class MusicService : MediaBrowserServiceCompat() {
         val stateBuilder = PlaybackStateCompat.Builder().setActions(availableActions)
 
         val state = stateBuilder
-            .setState(playbackState, currentStreamPosition.toLong(), 1.0f, SystemClock.elapsedRealtime())
+            .setState(playbackState, mediaPlayer.currentPosition.toLong(), 1.0f, SystemClock.elapsedRealtime())
             .build()
 
         mediaSession.setPlaybackState(state)

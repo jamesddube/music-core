@@ -32,7 +32,7 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 
-class MediaNotificationManager(val musicService: MusicService) : BroadcastReceiver() {
+class MediaNotification(val musicService: MusicService) : BroadcastReceiver() {
 
     private val notificationManager: NotificationManager =
         musicService.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -122,11 +122,11 @@ class MediaNotificationManager(val musicService: MusicService) : BroadcastReceiv
 
 
     fun updateNotification(
-        mMediaSession: MediaSessionCompat,
+        mediaSession: MediaSessionCompat,
         currentMediaMetadata: MediaMetadataCompat
     ) {
-        val playbackState = mMediaSession.controller.playbackState
-        val sessionToken = mMediaSession.controller.sessionToken
+        val playbackState = mediaSession.controller.playbackState
+        val sessionToken = mediaSession.controller.sessionToken
 
 
         val isPlaying = playbackState.state == PlaybackStateCompat.STATE_PLAYING
@@ -134,8 +134,12 @@ class MediaNotificationManager(val musicService: MusicService) : BroadcastReceiv
 
         val coverUri = currentMediaMetadata.getString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI)
         val cover = MediaStore.Images.Media.getBitmap(musicService.contentResolver, Uri.parse(coverUri))
-        mMediaSession.setMetadata(
+        mediaSession.setMetadata(
             MediaMetadataCompat.Builder()
+                .putText(MediaMetadataCompat.METADATA_KEY_TITLE, currentMediaMetadata.description.title)
+                .putText(MediaMetadataCompat.METADATA_KEY_ARTIST, currentMediaMetadata.description.subtitle)
+                .putText(MediaMetadataCompat.METADATA_KEY_ALBUM, currentMediaMetadata.getString(MediaMetadataCompat.METADATA_KEY_ALBUM))
+                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, currentMediaMetadata.getLong(MediaMetadataCompat.METADATA_KEY_DURATION))
                 .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, cover).build()
         )
 
@@ -148,7 +152,7 @@ class MediaNotificationManager(val musicService: MusicService) : BroadcastReceiv
                     .setShowActionsInCompactView(0, 1, 2, 3)
             )
             .setColorized(true)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification_24px)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(createContentIntent())
             .setContentTitle(currentMediaMetadata.description.title)
